@@ -47,8 +47,7 @@ public class WebSocketService extends Service {
     }
 
     private void connectWebSocket(String webSocketUrl) {
-//        URI uri = URI.create(webSocketUrl);
-        URI uri = URI.create("ws://192.168.3.6:10000/clipboard");
+        URI uri = URI.create(webSocketUrl);
         webSocketClient = new WebSocketClient(uri) {
             @Override
             public void onOpen(ServerHandshake serverHandshake) {
