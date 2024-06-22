@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -20,15 +21,23 @@ public class WebSocketService extends Service {
     private WebSocketClient webSocketClient;
     private static final String CHANNEL_ID = "your_channel_id";
 
+    private final IBinder binder = new LocalBinder();
+
+    public class LocalBinder extends Binder {
+        WebSocketService getService() {
+            return WebSocketService.this;
+        }
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // 创建通知
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("WebSocket Service")
-                .setContentText("正在运行...")
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("CopySync")
+                .setContentText("PC剪切板同步中...")
+                .setSmallIcon(R.drawable.copy_sync_icon)
                 .setContentIntent(pendingIntent)
                 .build();
         // 将服务设置为前台服务
@@ -43,7 +52,7 @@ public class WebSocketService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return binder;
     }
 
     private void connectWebSocket(String webSocketUrl) {
@@ -90,6 +99,10 @@ public class WebSocketService extends Service {
         if (webSocketClient != null) {
             webSocketClient.close();
         }
+    }
+
+    public void sendMessage(String text) {
+        webSocketClient.send(text);
     }
 }
 

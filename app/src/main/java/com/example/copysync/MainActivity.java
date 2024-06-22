@@ -3,11 +3,20 @@ package com.example.copysync;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ClipDescription;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,8 +38,31 @@ public class MainActivity extends AppCompatActivity {
     private static final String CHANNEL_NAME = "Your Channel Name";
 
     private static final int REQUEST_CODE_CAMERA = 1001;
-    private Button btnScan;
     private TextView tvResult;
+
+    private EditText editText;
+
+    private WebSocketService webSocketService;
+    private boolean isBound = false;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        new Handler().postDelayed(() -> {
+            if (clipboard.hasPrimaryClip()) {
+                // 获取剪切板内容
+                // 检查剪切板是否有文本数据
+                if (clipboard.hasPrimaryClip() && clipboard.getPrimaryClipDescription().hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+                    // 获取剪切板上的文本数据
+                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                    CharSequence text = item.getText();
+                    editText.setText(text);
+                }
+            }
+        }, 500); // 延迟500毫秒
+
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,9 +77,10 @@ public class MainActivity extends AppCompatActivity {
 
         createNotificationChannel();
 
-        btnScan = findViewById(R.id.btnScan);
         tvResult = findViewById(R.id.tvResult);
+        editText = findViewById(R.id.clipBoardText);
 
+        Button btnScan = findViewById(R.id.btnScan);
         btnScan.setOnClickListener(v -> {
             if (checkCameraPermission()) {
                 startQRCodeScanner();
@@ -56,8 +89,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        Button btnSync = findViewById(R.id.btnSync);
+        btnSync.setOnClickListener(v -> {
+            String sendText = editText.getText().toString();
+            if (isBound) {
+                webSocketService.sendMessage(sendText);
+            }
+        });
 
     }
+
+    private ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            WebSocketService.LocalBinder binder = (WebSocketService.LocalBinder) service;
+            webSocketService = binder.getService();
+            isBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isBound = false;
+        }
+    };
 
     private void createNotificationChannel() {
         // 创建通知渠道，仅在Android 8.0及以上版本需要
@@ -113,6 +167,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(this, WebSocketService.class);
                 intent.putExtra("WebSocketUrl", webSocketUrl);
                 startService(intent); // 启动服务
+                bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
